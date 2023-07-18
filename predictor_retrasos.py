@@ -22,8 +22,8 @@ warnings.filterwarnings("ignore")
 class Model():
     def __init__(self, model=None, params=None):
         '''
-        model corresponde al modelo que ya está entrenado, si a este se le asigna None entonces el código deberá entrenar.
-        params corresponde a un diccionario con los parametros del modelo para entrenar 
+        'model' corresponde al modelo que ya está entrenado, si a este se le asigna None entonces el código deberá entrenar.
+        'params' corresponde a un diccionario con los parametros del modelo para entrenar 
         ''' 
 
         if model is None:
@@ -34,28 +34,26 @@ class Model():
                                       subsample=params['subsample'])
 
         elif model is not None:
-            self.model = xgb.XGBClassifier(random_state=params['random_state'],
-                                      learning_rate=params['learning_rate'],
-                                      max_depth=params['max_depth'],
-                                      colsample_bytree=params['colsample_bytree'],
-                                      subsample=params['subsample'])
-            print(self.model)
-            self.model = self.model.load_model(model)
-            print(self.model)
+            self.model = xgb.XGBClassifier()
+            self.model.load_model(model)
 
     def train(self, x_train, y_train,x_val, y_val):
+        '''método para realizar el entrenamiento'''
+
         self.model.fit(x_train,y_train)
         y_pred = self.model.predict(x_val)
         
         cm = confusion_matrix(y_val,y_pred)
         print(cm)
         print("--"*10)
-        print(round(accuracy_score(y_val,y_pred),3),"%")
+        print(round(accuracy_score(y_val,y_pred),3)*100,"%")
         print("--"*10)
-        print(classification_report())
+        print(classification_report(y_val,y_pred))
 
 
     def predict(self,x):
+        '''método para hacer la predicción'''
+
         y_pred = self.model.predict(x)
 
         return y_pred
@@ -74,7 +72,7 @@ PARAMS = {'random_state':config.getint('params','random_state'),
 
 MODELO = config.get('params','model')
 
-#Abriendo el archivo
+#Bloque de preprocesamiento de datos
 data = pd.read_csv('final_feat.csv',index_col='Unnamed: 0')
 X = data.drop(columns=['atraso_15']) if TRAIN else data
 y = data['atraso_15']
@@ -87,14 +85,13 @@ if TRAIN:
     X_train, X_test, y_train, y_test = train_test_split(X_feat,y,test_size=0.2,stratify=y,random_state=23)
 
     xgboost.train(x_train=X_train,x_val=X_test,y_train=y_train,y_val=y_test)
-    xgboost.model.save_model('xgb_trained_model.bin')
+    xgboost.model.save_model('xgb_trained_model.json')
 
 else:
     ##Prueba:
-    X_feat = X_feat.iloc[-3:,:]
     xgboost = Model(model=MODELO,params=PARAMS)
-    print(xgboost.model)
+    X_feat = np.array(X_feat.iloc[-3:,:])
     pred = xgboost.predict(X_feat)
-    pred_file = {'index':X.index,'atraso_15':pred}
+    pred_file = {'index':X.iloc[-3:,:].index,'atraso_15':pred}
     df = pd.DataFrame(pred_file)
     df.to_csv("predicción.csv")
